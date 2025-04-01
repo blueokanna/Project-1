@@ -1,4 +1,4 @@
-use criterion::{black_box, Criterion, criterion_group, criterion_main, Bencher};
+use criterion::{black_box, criterion_group, criterion_main, Bencher, Criterion};
 use num_bigint::BigUint;
 use HuangProject::{audit, issue_credential, keygen_parties, prove, revoke, setup, verify};
 
@@ -12,16 +12,15 @@ fn bench_issue_credential(c: &mut Criterion) {
         b.iter(|| {
             let uid = 1001;
             // 只关注发行操作本身
-            let _cred = black_box(
-                issue_credential(
-                    &sys_params,
-                    &issuer_keys,
-                    &user_keys,
-                    &[10, 20, 30],
-                    100,
-                    uid,
-                )
-            ).unwrap();
+            let _cred = black_box(issue_credential(
+                &sys_params,
+                &issuer_keys,
+                &user_keys,
+                &[10, 20, 30],
+                100,
+                uid,
+            ))
+            .unwrap();
         });
     });
 }
@@ -32,14 +31,19 @@ fn bench_prove(c: &mut Criterion) {
     let (issuer_keys, user_keys, _auditor_keys) = keygen_parties();
 
     // 先发行一个凭证
-    let cred = issue_credential(&sys_params, &issuer_keys, &user_keys, &[10, 20, 30], 100, 999)
-        .unwrap();
+    let cred = issue_credential(
+        &sys_params,
+        &issuer_keys,
+        &user_keys,
+        &[10, 20, 30],
+        100,
+        999,
+    )
+    .unwrap();
 
     c.bench_function("prove_zk", |b| {
         b.iter(|| {
-            let _zk_proof = black_box(
-                prove(&cred, &sys_params.accumulator)
-            ).unwrap();
+            let _zk_proof = black_box(prove(&cred, &sys_params.accumulator)).unwrap();
         });
     });
 }
@@ -50,15 +54,20 @@ fn bench_verify(c: &mut Criterion) {
     let (issuer_keys, user_keys, _auditor_keys) = keygen_parties();
 
     // 先发行一个凭证并生成证明
-    let cred = issue_credential(&sys_params, &issuer_keys, &user_keys, &[10, 20, 30], 100, 999)
-        .unwrap();
+    let cred = issue_credential(
+        &sys_params,
+        &issuer_keys,
+        &user_keys,
+        &[10, 20, 30],
+        100,
+        999,
+    )
+    .unwrap();
     let zk_proof = prove(&cred, &sys_params.accumulator).unwrap();
 
     c.bench_function("verify_zk", |b| {
         b.iter(|| {
-            let _ = black_box(
-                verify(&cred, &zk_proof, &sys_params.accumulator)
-            ).unwrap();
+            let _ = black_box(verify(&cred, &zk_proof, &sys_params.accumulator)).unwrap();
         });
     });
 }
@@ -71,9 +80,7 @@ fn bench_revoke(c: &mut Criterion) {
     c.bench_function("revoke_credential", |b| {
         b.iter(|| {
             // 模拟撤销某个 uid
-            let _ = black_box(
-                revoke(&mut sys_params, 1234)
-            ).unwrap();
+            let _ = black_box(revoke(&mut sys_params, 1234)).unwrap();
         });
     });
 }
@@ -84,7 +91,9 @@ fn bench_audit(c: &mut Criterion) {
     let mut sys_params = setup(128);
     for i in 0..10 {
         sys_params.accumulator.add(BigUint::from(i as u64));
-        sys_params.bulletin_board.push(format!("Blacklisted uid {}", i));
+        sys_params
+            .bulletin_board
+            .push(format!("Blacklisted uid {}", i));
     }
 
     c.bench_function("audit_bulletin_board", |b| {
@@ -110,51 +119,3 @@ criterion_group!(
 
 // 入口
 criterion_main!(anon_cred_benches);
-
-
-// -------------------------------------
-// 2) 使用 benchmark-rs 做基准测试
-//    这里有两种方法：
-//    A) 直接用 #[bench] 宏 (需要 nightly)
-//    B) 或者用 benchmark-rs 的自定义方法
-// -------------------------------------
-
-// A) 如果要用 #[bench] 宏，需要 nightly + feature(test)
-#[cfg(feature = "nightly_bench")]
-#[bench]
-fn bench_issue_credential_benchrs(bencher: &mut Bencher) {
-    let sys_params = setup(128);
-    let (issuer_keys, user_keys, _auditor_keys) = keygen_parties();
-
-    bencher.iter(|| {
-        let uid = 1001;
-        let _cred = issue_credential(
-            &sys_params,
-            &issuer_keys,
-            &user_keys,
-            &[10, 20, 30],
-            100,
-            uid,
-        ).unwrap();
-    });
-}
-
-// B) 或者使用 benchmark-rs 的 `Bencher` 结构（不用 #[bench] 宏）
-#[cfg(feature = "nightly_bench")]
-#[bench]
-fn bench_issue_credential_benchrs_2(bencher: &mut Bencher) {
-    let sys_params = setup(128);
-    let (issuer_keys, user_keys, _auditor_keys) = keygen_parties();
-
-    bencher.iter(|| {
-        let uid = 1001;
-        let _cred = issue_credential(
-            &sys_params,
-            &issuer_keys,
-            &user_keys,
-            &[10, 20, 30],
-            100,
-            uid,
-        ).unwrap();
-    });
-}
